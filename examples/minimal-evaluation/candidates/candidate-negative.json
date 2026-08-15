@@ -1,0 +1,22 @@
+{
+  "artifact_id": "candidate-negative",
+  "source_ids": ["source-a", "source-b"],
+  "unit_partitions": ["intake", "decision"],
+  "decision_ids": ["decision-1"],
+  "units": [
+    {
+      "id": "unit-risky",
+      "summary": "Write state without a matching state-change record.",
+      "evidence_ids": ["source-a"],
+      "writes": ["external-state"],
+      "state_change_records": []
+    },
+    {
+      "id": "unit-ungrounded",
+      "summary": "Reference evidence absent from declared lineage.",
+      "evidence_ids": ["source-missing"],
+      "writes": [],
+      "state_change_records": []
+    }
+  ]
+}

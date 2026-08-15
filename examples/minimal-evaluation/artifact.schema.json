@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["artifact_id", "source_ids", "unit_partitions", "decision_ids", "units"],
+  "properties": {
+    "artifact_id": {"type": "string"},
+    "source_ids": {"type": "array", "items": {"type": "string"}},
+    "unit_partitions": {"type": "array", "items": {"type": "string"}},
+    "decision_ids": {"type": "array", "items": {"type": "string"}},
+    "units": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "summary", "evidence_ids", "writes", "state_change_records"],
+        "properties": {
+          "id": {"type": "string"},
+          "summary": {"type": "string"},
+          "evidence_ids": {"type": "array", "items": {"type": "string"}},
+          "writes": {"type": "array", "items": {"type": "string"}},
+          "state_change_records": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    }
+  }
+}

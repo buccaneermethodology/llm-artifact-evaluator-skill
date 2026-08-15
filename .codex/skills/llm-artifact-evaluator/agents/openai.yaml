@@ -1,0 +1,4 @@
+interface:
+  display_name: "LLM Artifact Evaluator"
+  short_description: "Evaluate structured LLM artifacts safely"
+  default_prompt: "Use $llm-artifact-evaluator to evaluate structured LLM outputs with schema, lineage, golden, and candidate-only checks."

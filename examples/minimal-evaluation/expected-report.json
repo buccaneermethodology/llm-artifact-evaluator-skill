@@ -1,0 +1,46 @@
+{
+  "candidate": "candidates/candidate-pass.json",
+  "case": "minimal-evaluation",
+  "core_status": "pass",
+  "core_vocabulary": [
+    "pass",
+    "error",
+    "warning",
+    "not_run"
+  ],
+  "evidence_ceiling": "This report covers configured deterministic checks and heuristic risks only; it does not prove semantic truth or production readiness.",
+  "findings": [
+    {
+      "code": "EVAL-SCHEMA-VALID",
+      "message": "Candidate satisfies the configured schema.",
+      "status": "pass"
+    },
+    {
+      "code": "EVAL-LINEAGE-VALID",
+      "message": "Candidate lineage covers required and referenced sources.",
+      "status": "pass"
+    },
+    {
+      "code": "EVAL-GOLDEN-MATCH",
+      "message": "Configured golden dimensions match.",
+      "status": "pass"
+    },
+    {
+      "code": "EVAL-CANDIDATE-RISK-CLEAR",
+      "message": "Configured candidate-only risks were not detected.",
+      "status": "pass"
+    },
+    {
+      "code": "EVAL-NEGATIVE-NOT-APPLICABLE",
+      "message": "Candidate is not registered as a negative fixture.",
+      "status": "not_run"
+    }
+  ],
+  "profile": {
+    "profile_name": null,
+    "project_label": "pass",
+    "project_status": "pass",
+    "strict_warning_codes_triggered": []
+  },
+  "report_version": "1.0"
+}

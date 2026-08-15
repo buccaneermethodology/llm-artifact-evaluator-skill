@@ -1,0 +1,22 @@
+{
+  "artifact_id": "golden-v1",
+  "source_ids": ["source-a", "source-b"],
+  "unit_partitions": ["intake", "decision"],
+  "decision_ids": ["decision-1"],
+  "units": [
+    {
+      "id": "unit-intake",
+      "summary": "Collect grounded inputs.",
+      "evidence_ids": ["source-a"],
+      "writes": [],
+      "state_change_records": []
+    },
+    {
+      "id": "unit-decision",
+      "summary": "Record the bounded decision.",
+      "evidence_ids": ["source-b"],
+      "writes": ["decision-record"],
+      "state_change_records": ["decision-record"]
+    }
+  ]
+}

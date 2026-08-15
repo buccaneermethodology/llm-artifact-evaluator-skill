@@ -1,0 +1,13 @@
+{
+  "contract_version": "1.0",
+  "schema": "artifact.schema.json",
+  "required_source_ids": ["source-a", "source-b"],
+  "golden": {
+    "path": "golden.json",
+    "authority": "human_reviewed_example",
+    "provenance": "A project reviewer selected this example independently of the evaluated candidates.",
+    "dimensions": ["unit_partitions", "decision_ids"]
+  },
+  "candidate_risk_checks": ["unrecorded_state_write", "missing_evidence_reference"],
+  "negative_expectations": "negative-expectations.json"
+}

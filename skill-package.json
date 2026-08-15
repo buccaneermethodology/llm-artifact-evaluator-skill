@@ -1,0 +1,14 @@
+{
+  "package_name": "llm-artifact-evaluator-skill",
+  "skill_name": "llm-artifact-evaluator",
+  "version": "1.0.0",
+  "license": "MIT",
+  "source_provenance": "Generalized from bounded structured-artifact evaluation practice and released with self-contained public fixtures.",
+  "evidence_ceiling": "The package demonstrates deterministic checks on bundled fixtures; it does not prove semantic truth, production readiness, or universal project maturity.",
+  "entrypoints": {
+    "skill": ".codex/skills/llm-artifact-evaluator/SKILL.md",
+    "evaluator": "scripts/evaluate_artifacts.py",
+    "reference": ".codex/skills/llm-artifact-evaluator/references/REFERENCE.md",
+    "tests": "tests/run_tests.py"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "profile_name": "example-project-strict",
+  "labels": {
+    "pass": "accepted-by-project-policy",
+    "warning": "project-review-required",
+    "error": "project-blocked",
+    "not_run": "project-check-unavailable"
+  },
+  "strict_warning_codes": ["EVAL-CANDIDATE-RISK"]
+}

@@ -1,0 +1,15 @@
+{
+  "artifact_id": "candidate-golden-mismatch",
+  "source_ids": ["source-a", "source-b"],
+  "unit_partitions": ["all-in-one"],
+  "decision_ids": [],
+  "units": [
+    {
+      "id": "unit-all",
+      "summary": "Collapse intake and decisions.",
+      "evidence_ids": ["source-a", "source-b"],
+      "writes": [],
+      "state_change_records": []
+    }
+  ]
+}
