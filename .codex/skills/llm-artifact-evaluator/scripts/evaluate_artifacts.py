@@ -179,9 +179,15 @@ def evaluate(case_dir: Path, candidate_path: Path, profile_path: Path | None) ->
         try:
             source_registry = load_registry(case_dir / registry_ref)
             resolutions = resolve_registry(sorted(declared_sources), source_registry, base_dir=case_dir)
+            # Pass resolver evidence to opt-in detectors so they do not infer
+            # resolution from registry declarations alone.
+            resolved_source_context = resolutions
             bad = [item for item in resolutions if item.get("status") in {"unresolved", "error"}]
+            uncertain = [item for item in resolutions if item.get("status") == "inconclusive"]
             if bad:
                 findings.append(finding("EVAL-LINEAGE-SOURCE-UNRESOLVED", "error", "One or more declared sources cannot be resolved or verified.", sources=bad))
+            elif uncertain:
+                findings.append(finding("EVAL-LINEAGE-SOURCE-INCONCLUSIVE", "warning", "One or more declared sources cannot be fully verified from the supplied registry.", sources=uncertain, result="inconclusive"))
             else:
                 findings.append(finding("EVAL-LINEAGE-SOURCE-VERIFIED", "pass", "Declared sources resolve through the configured offline registry.", sources=resolutions))
         except (OSError, ValueError, json.JSONDecodeError) as exc:
@@ -213,6 +219,9 @@ def evaluate(case_dir: Path, candidate_path: Path, profile_path: Path | None) ->
                     path, kind, options = dimension.get("path", ""), dimension.get("comparator", "exact"), dimension.get("options", {})
                 golden_found, golden_value = get_path(golden, path)
                 candidate_found, candidate_value = get_path(candidate, path)
+                if not golden_found or not candidate_found:
+                    inconclusive.append({"dimension": path, "comparator": kind, "category": "inconclusive", "golden": "<missing>" if not golden_found else golden_value, "candidate": "<missing>" if not candidate_found else candidate_value, "details": {"reason": "dimension path is missing"}})
+                    continue
                 comparison = compare_dimension(kind, golden_value if golden_found else None, candidate_value if candidate_found else None, options=options)
                 if comparison.matched is False:
                     item = comparison.as_dict()
@@ -252,7 +261,9 @@ def evaluate(case_dir: Path, candidate_path: Path, profile_path: Path | None) ->
             if missing_evidence:
                 risk_details.append({"unit_id": unit.get("id"), "risk": "missing_evidence_reference", "evidence_ids": missing_evidence})
     else:
-        risk_details = run_candidate_detectors(candidate, contract, source_registry=source_registry)
+        detector_contract = dict(contract)
+        detector_contract["resolved_sources"] = locals().get("resolved_source_context", [])
+        risk_details = run_candidate_detectors(candidate, detector_contract, source_registry=source_registry)
     if risk_details:
         findings.append(
             finding(

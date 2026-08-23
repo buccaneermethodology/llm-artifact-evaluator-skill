@@ -191,11 +191,13 @@ def stale_or_superseded_input(candidate: dict[str, Any], context: dict[str, Any]
 def unverified_external_dependency(candidate: dict[str, Any], context: dict[str, Any]) -> list[dict[str, Any]]:
     registry = _registry_entries(context.get("source_registry"))
     unresolved = []
+    resolved_results = {item.get("source_id"): item for item in context.get("resolved_sources", []) if isinstance(item, dict)}
     for source_id in candidate.get("source_ids", []):
         entry = registry.get(source_id)
         if isinstance(entry, dict) and entry.get("kind") in {"url", "external", "external_url", "repo_symbol"}:
             receipt = entry.get("receipt") if isinstance(entry.get("receipt"), dict) else {}
-            if not (entry.get("resolved") and (entry.get("content_digest") or entry.get("digest") or receipt.get("sha256") or receipt.get("digest"))):
+            resolved = resolved_results.get(source_id, {})
+            if resolved.get("status") not in {"resolved"} or not resolved.get("content_verified"):
                 unresolved.append(source_id)
     if not unresolved:
         return []

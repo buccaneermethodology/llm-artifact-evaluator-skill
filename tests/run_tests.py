@@ -227,6 +227,34 @@ def test_opt_in_candidate_detector() -> None:
         temporary.cleanup()
 
 
+def test_missing_golden_dimension_is_inconclusive() -> None:
+    temporary, case_dir = copy_fixture()
+    try:
+        contract = json.loads((case_dir / "contract.json").read_text(encoding="utf-8"))
+        contract["golden"]["dimensions"] = ["does_not_exist"]
+        write_json(case_dir / "contract.json", contract)
+        returncode, report = run(case_dir, "candidates/candidate-pass.json")
+        assert returncode == 0
+        assert "EVAL-GOLDEN-INCONCLUSIVE" in codes(report)
+    finally:
+        temporary.cleanup()
+
+
+def test_source_registry_inconclusive_is_not_verified() -> None:
+    temporary, case_dir = copy_fixture()
+    try:
+        contract = json.loads((case_dir / "contract.json").read_text(encoding="utf-8"))
+        contract["source_registry"] = "source-registry.json"
+        write_json(case_dir / "source-registry.json", {"sources": {"source-a": {"kind": "unsupported"}, "source-b": {"kind": "unsupported"}}})
+        write_json(case_dir / "contract.json", contract)
+        returncode, report = run(case_dir, "candidates/candidate-pass.json")
+        assert returncode == 0
+        assert "EVAL-LINEAGE-SOURCE-INCONCLUSIVE" in codes(report)
+        assert "EVAL-LINEAGE-SOURCE-VERIFIED" not in codes(report)
+    finally:
+        temporary.cleanup()
+
+
 def main() -> int:
     tests = [
         test_positive,
@@ -244,6 +272,8 @@ def main() -> int:
         test_semantic_contract_failure,
         test_source_registry_resolution,
         test_opt_in_candidate_detector,
+        test_missing_golden_dimension_is_inconclusive,
+        test_source_registry_inconclusive_is_not_verified,
     ]
     for test in tests:
         test()

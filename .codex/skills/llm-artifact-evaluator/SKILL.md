@@ -16,7 +16,7 @@ Use this workflow when an LLM can produce a plausible artifact but downstream us
 5. Validate schema and lineage before semantic comparison.
 6. Compare configured golden dimensions with typed comparators (`exact`, `set`, `multiset`, `partition`, `mapping`, `coverage`, `graph`, `bounded_numeric`, `absence`), then run explicitly selected candidate-only risk checks.
 7. If configured, resolve declared sources through an offline `source_registry`; external URLs require a saved receipt and are never fetched by deterministic CI.
-8. If configured, run the portable `semantic_contract` predicates and report semantic failures separately from structural checks.
+8. If configured, run the portable `semantic_contract` presence/invariant checks and report semantic failures separately from structural checks; do not present these bounded checks as universal semantic truth.
 9. Keep deterministic contract failures as `error`, heuristic risks as `warning`, successful checks as `pass`, and unavailable checks as `not_run`.
 10. Apply an optional project profile only after core evaluation. Permit stricter project policy or display labels, but never downgrade or hide a core error. Return a nonzero CLI exit when either core or project status is `error`.
 11. Use bounded revision loops only after reports contain stable finding codes and exact repair evidence.

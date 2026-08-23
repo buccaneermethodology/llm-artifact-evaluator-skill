@@ -231,7 +231,7 @@ Keep finding codes stable within a major version. Add fields compatibly and vers
 
 Golden dimensions may remain dotted strings for backward-compatible exact comparison, or use an object such as `{"path": "decision_ids", "comparator": "set"}`. Supported comparators are `exact`, `set`, `multiset`, `partition`, `mapping`, `coverage`, `graph`, `bounded_numeric`, and `absence`. Malformed or unobservable dimensions return an inconclusive finding rather than a false semantic failure.
 
-An optional `semantic_contract` can define `roles`, path-based `invariants`, `forbidden_collapses`, and a project `claim_ceiling`. It supplies project meaning; the portable evaluator does not invent ontology or authority. Candidate-only detectors are opt-in through `candidate_risk_checks` and remain advisory warnings unless a project profile explicitly tightens them.
+An optional `semantic_contract` can define `roles`, path-presence `invariants`, `forbidden_collapses`, and a project `claim_ceiling`. These are bounded structural semantic checks, not universal semantic truth; the portable evaluator does not invent ontology or authority. Candidate-only detectors are opt-in through `candidate_risk_checks` and remain advisory warnings unless a project profile explicitly tightens them.
 
 An optional `source_registry` maps source IDs to local files/directories, repository symbols, or external URL entries with saved receipts. Local content can be checked for existence and SHA-256. External receipts can be checked for URL identity, digest, and configured freshness without network access.
 
