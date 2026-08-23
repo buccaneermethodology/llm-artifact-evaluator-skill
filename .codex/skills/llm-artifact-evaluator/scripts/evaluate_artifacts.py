@@ -9,6 +9,10 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from candidate_detectors import run_candidate_detectors
+from source_registry import load_registry, resolve_registry
+from typed_comparators import compare_dimension
+
 CORE_STATUSES = ("pass", "error", "warning", "not_run")
 FORBIDDEN_PROFILE_KEYS = {
     "core_status_overrides",
@@ -75,6 +79,45 @@ def get_path(value: Any, dotted_path: str) -> tuple[bool, Any]:
     return True, current
 
 
+def semantic_findings(candidate: dict[str, Any], contract: dict[str, Any]) -> list[dict[str, Any]]:
+    """Run portable, contract-driven semantic predicates.
+
+    The evaluator does not infer domain meaning.  It only checks relationships
+    explicitly supplied by the caller, keeping the public skill portable.
+    """
+    semantic = contract.get("semantic_contract")
+    if not semantic:
+        return []
+    results: list[dict[str, Any]] = []
+    roles = semantic.get("roles", {})
+    for path, expected_role in roles.items():
+        found, value = get_path(candidate, path.lstrip("$."))
+        if not found:
+            results.append(finding("EVAL-SEMANTIC-FAIL", "error", "Configured semantic role path is missing.", path=path, expected_role=expected_role))
+        elif value in (None, [], {}, ""):
+            results.append(finding("EVAL-SEMANTIC-INCONCLUSIVE", "warning", "Configured semantic role has no observable value.", path=path, role=expected_role, result="inconclusive"))
+    for invariant in semantic.get("invariants", []):
+        if isinstance(invariant, str):
+            name, path = invariant, invariant
+        else:
+            name, path = invariant.get("name", "unnamed"), invariant.get("path", "")
+        if path:
+            found, value = get_path(candidate, path.lstrip("$."))
+            if not found or value in (None, [], {}, ""):
+                results.append(finding("EVAL-SEMANTIC-FAIL", "error", "Configured semantic invariant is not satisfied.", invariant=name, path=path))
+        else:
+            results.append(finding("EVAL-SEMANTIC-INCONCLUSIVE", "warning", "Semantic invariant has no executable predicate.", invariant=name, result="inconclusive"))
+    forbidden = semantic.get("forbidden_collapses", [])
+    text = json.dumps(candidate, ensure_ascii=False).lower()
+    for item in forbidden:
+        pattern = item if isinstance(item, str) else item.get("pattern", "")
+        if pattern and pattern.lower() in text:
+            results.append(finding("EVAL-SEMANTIC-FORBIDDEN-COLLAPSE", "error", "Candidate contains a forbidden semantic collapse.", pattern=pattern))
+    if not results:
+        results.append(finding("EVAL-SEMANTIC-VALID", "pass", "Configured semantic contract is satisfied."))
+    return results
+
+
 def aggregate_status(findings: list[dict[str, Any]]) -> str:
     statuses = {item["status"] for item in findings}
     if "error" in statuses:
@@ -130,6 +173,20 @@ def evaluate(case_dir: Path, candidate_path: Path, profile_path: Path | None) ->
     else:
         findings.append(finding("EVAL-LINEAGE-VALID", "pass", "Candidate lineage covers required and referenced sources."))
 
+    source_registry = None
+    registry_ref = contract.get("source_registry")
+    if registry_ref:
+        try:
+            source_registry = load_registry(case_dir / registry_ref)
+            resolutions = resolve_registry(sorted(declared_sources), source_registry, base_dir=case_dir)
+            bad = [item for item in resolutions if item.get("status") in {"unresolved", "error"}]
+            if bad:
+                findings.append(finding("EVAL-LINEAGE-SOURCE-UNRESOLVED", "error", "One or more declared sources cannot be resolved or verified.", sources=bad))
+            else:
+                findings.append(finding("EVAL-LINEAGE-SOURCE-VERIFIED", "pass", "Declared sources resolve through the configured offline registry.", sources=resolutions))
+        except (OSError, ValueError, json.JSONDecodeError) as exc:
+            findings.append(finding("EVAL-LINEAGE-SOURCE-INCONCLUSIVE", "warning", "Source registry could not be evaluated.", reason=str(exc), result="inconclusive"))
+
     golden_config = contract.get("golden")
     if not golden_config:
         findings.append(finding("EVAL-GOLDEN-NOT-CONFIGURED", "not_run", "No golden comparison is configured."))
@@ -148,17 +205,23 @@ def evaluate(case_dir: Path, candidate_path: Path, profile_path: Path | None) ->
         else:
             golden = load_json(golden_path)
             mismatches: list[dict[str, Any]] = []
+            inconclusive: list[dict[str, Any]] = []
             for dimension in golden_config.get("dimensions", []):
-                golden_found, golden_value = get_path(golden, dimension)
-                candidate_found, candidate_value = get_path(candidate, dimension)
-                if not golden_found or not candidate_found or golden_value != candidate_value:
-                    mismatches.append(
-                        {
-                            "dimension": dimension,
-                            "golden": golden_value if golden_found else "<missing>",
-                            "candidate": candidate_value if candidate_found else "<missing>",
-                        }
-                    )
+                if isinstance(dimension, str):
+                    path, kind, options = dimension, "exact", {}
+                else:
+                    path, kind, options = dimension.get("path", ""), dimension.get("comparator", "exact"), dimension.get("options", {})
+                golden_found, golden_value = get_path(golden, path)
+                candidate_found, candidate_value = get_path(candidate, path)
+                comparison = compare_dimension(kind, golden_value if golden_found else None, candidate_value if candidate_found else None, options=options)
+                if comparison.matched is False:
+                    item = comparison.as_dict()
+                    item["dimension"] = path
+                    mismatches.append(item)
+                elif comparison.matched is None:
+                    item = comparison.as_dict()
+                    item["dimension"] = path
+                    inconclusive.append(item)
             if mismatches:
                 findings.append(
                     finding(
@@ -168,23 +231,28 @@ def evaluate(case_dir: Path, candidate_path: Path, profile_path: Path | None) ->
                         mismatches=mismatches,
                     )
                 )
+            elif inconclusive:
+                findings.append(finding("EVAL-GOLDEN-INCONCLUSIVE", "warning", "Some configured golden dimensions cannot be compared from the supplied values.", dimensions=inconclusive, result="inconclusive"))
             else:
                 findings.append(finding("EVAL-GOLDEN-MATCH", "pass", "Configured golden dimensions match."))
 
+    selected_risks = contract.get("candidate_risk_checks", [])
+    legacy_only = set(selected_risks).issubset({"unrecorded_state_write", "missing_evidence_reference"})
     risk_details: list[dict[str, Any]] = []
-    for unit in candidate.get("units", []):
-        if not isinstance(unit, dict):
-            continue
-        writes = set(unit.get("writes", []))
-        recorded = set(unit.get("state_change_records", []))
-        unrecorded = sorted(writes - recorded)
-        if unrecorded:
-            risk_details.append({"unit_id": unit.get("id"), "risk": "unrecorded_state_write", "writes": unrecorded})
-        missing_evidence = sorted(set(unit.get("evidence_ids", [])) - declared_sources)
-        if missing_evidence:
-            risk_details.append(
-                {"unit_id": unit.get("id"), "risk": "missing_evidence_reference", "evidence_ids": missing_evidence}
-            )
+    if legacy_only:
+        for unit in candidate.get("units", []):
+            if not isinstance(unit, dict):
+                continue
+            writes = set(unit.get("writes", []))
+            recorded = set(unit.get("state_change_records", []))
+            unrecorded = sorted(writes - recorded)
+            if unrecorded:
+                risk_details.append({"unit_id": unit.get("id"), "risk": "unrecorded_state_write", "writes": unrecorded})
+            missing_evidence = sorted(set(unit.get("evidence_ids", [])) - declared_sources)
+            if missing_evidence:
+                risk_details.append({"unit_id": unit.get("id"), "risk": "missing_evidence_reference", "evidence_ids": missing_evidence})
+    else:
+        risk_details = run_candidate_detectors(candidate, contract, source_registry=source_registry)
     if risk_details:
         findings.append(
             finding(
@@ -226,6 +294,10 @@ def evaluate(case_dir: Path, candidate_path: Path, profile_path: Path | None) ->
     else:
         findings.append(finding("EVAL-NEGATIVE-NOT-CONFIGURED", "not_run", "No negative expectations are configured."))
 
+    configured_semantic = bool(contract.get("semantic_contract"))
+    semantic_results = semantic_findings(candidate, contract) if configured_semantic else []
+    findings.extend(semantic_results)
+
     core_status = aggregate_status(findings)
     profile_result: dict[str, Any] = {
         "profile_name": None,
@@ -263,8 +335,8 @@ def evaluate(case_dir: Path, candidate_path: Path, profile_path: Path | None) ->
         candidate_ref = candidate_path.resolve().relative_to(case_dir.resolve()).as_posix()
     except ValueError:
         candidate_ref = candidate_path.name
-    return {
-        "report_version": "1.0",
+    report = {
+        "report_version": "1.1" if (configured_semantic or registry_ref or any(isinstance(item, dict) for item in (golden_config or {}).get("dimensions", []))) else "1.0",
         "case": case_dir.name,
         "candidate": candidate_ref,
         "core_vocabulary": list(CORE_STATUSES),
@@ -276,6 +348,14 @@ def evaluate(case_dir: Path, candidate_path: Path, profile_path: Path | None) ->
             "it does not prove semantic truth or production readiness."
         ),
     }
+    if configured_semantic:
+        report["semantic"] = {
+            "status": "error" if any(item["status"] == "error" for item in semantic_results) else ("warning" if any(item["status"] == "warning" for item in semantic_results) else "pass"),
+            "finding_codes": [item["code"] for item in semantic_results],
+        }
+    if registry_ref:
+        report["lineage"] = {"source_registry": registry_ref, "offline": True}
+    return report
 
 
 def main() -> int:

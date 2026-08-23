@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import runpy
+import sys
 from pathlib import Path
 
 
@@ -16,4 +17,5 @@ if __name__ == "__main__":
         / "scripts"
         / "evaluate_artifacts.py"
     )
+    sys.path.insert(0, str(bundled.parent))
     runpy.run_path(str(bundled), run_name="__main__")

@@ -159,6 +159,74 @@ def test_profile_masking_is_rejected() -> None:
         temporary.cleanup()
 
 
+def test_typed_golden_set_comparator() -> None:
+    temporary, case_dir = copy_fixture()
+    try:
+        contract = json.loads((case_dir / "contract.json").read_text(encoding="utf-8"))
+        contract["golden"]["dimensions"] = [{"path": "decision_ids", "comparator": "set"}]
+        write_json(case_dir / "contract.json", contract)
+        candidate_path = case_dir / "candidates" / "candidate-pass.json"
+        candidate = json.loads(candidate_path.read_text(encoding="utf-8"))
+        candidate["decision_ids"] = ["decision-1"]
+        write_json(candidate_path, candidate)
+        returncode, report = run(case_dir, "candidates/candidate-pass.json")
+        assert returncode == 0
+        assert "EVAL-GOLDEN-MATCH" in codes(report)
+    finally:
+        temporary.cleanup()
+
+
+def test_semantic_contract_failure() -> None:
+    temporary, case_dir = copy_fixture()
+    try:
+        contract = json.loads((case_dir / "contract.json").read_text(encoding="utf-8"))
+        contract["semantic_contract"] = {"roles": {"missing_field": "decision"}}
+        write_json(case_dir / "contract.json", contract)
+        returncode, report = run(case_dir, "candidates/candidate-pass.json")
+        assert returncode == 1
+        assert "EVAL-SEMANTIC-FAIL" in codes(report)
+        assert report["semantic"]["status"] == "error"
+    finally:
+        temporary.cleanup()
+
+
+def test_source_registry_resolution() -> None:
+    temporary, case_dir = copy_fixture()
+    try:
+        source = case_dir / "source-a.txt"
+        source.write_text("grounded source\n", encoding="utf-8")
+        import hashlib
+        digest = hashlib.sha256(source.read_bytes()).hexdigest()
+        contract = json.loads((case_dir / "contract.json").read_text(encoding="utf-8"))
+        contract["source_registry"] = "source-registry.json"
+        write_json(case_dir / "source-registry.json", {"sources": {"source-a": {"kind": "local_file", "path": "source-a.txt", "sha256": digest}, "source-b": {"kind": "local_file", "path": "source-a.txt", "sha256": digest}}})
+        write_json(case_dir / "contract.json", contract)
+        returncode, report = run(case_dir, "candidates/candidate-pass.json")
+        assert returncode == 0
+        assert "EVAL-LINEAGE-SOURCE-VERIFIED" in codes(report)
+    finally:
+        temporary.cleanup()
+
+
+def test_opt_in_candidate_detector() -> None:
+    temporary, case_dir = copy_fixture()
+    try:
+        contract = json.loads((case_dir / "contract.json").read_text(encoding="utf-8"))
+        contract["candidate_risk_checks"] = ["claim_ceiling_breach"]
+        contract["claim_ceiling"] = {"forbidden": ["production-ready"]}
+        write_json(case_dir / "contract.json", contract)
+        candidate_path = case_dir / "candidates" / "candidate-pass.json"
+        candidate = json.loads(candidate_path.read_text(encoding="utf-8"))
+        candidate["claims"] = ["production-ready"]
+        write_json(candidate_path, candidate)
+        returncode, report = run(case_dir, "candidates/candidate-pass.json")
+        assert returncode == 0
+        assert any(item.get("code") == "EVAL-RISK-CLAIM-CEILING-BREACH" for item in report["findings"][3]["details"]["risks"])
+        assert report["core_status"] == "warning"
+    finally:
+        temporary.cleanup()
+
+
 def main() -> int:
     tests = [
         test_positive,
@@ -172,6 +240,10 @@ def main() -> int:
         test_profile_can_tighten_without_rewriting_core,
         test_unique_codex_skill_root,
         test_profile_masking_is_rejected,
+        test_typed_golden_set_comparator,
+        test_semantic_contract_failure,
+        test_source_registry_resolution,
+        test_opt_in_candidate_detector,
     ]
     for test in tests:
         test()

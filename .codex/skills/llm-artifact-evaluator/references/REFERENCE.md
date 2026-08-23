@@ -199,7 +199,7 @@ Keep it advisory, narrow the smell with more grounded structure, and add a false
 
 ### Required source is present but unit evidence is invented
 
-The lineage check compares unit references to declared candidate sources. Extend the project validator to verify those identifiers against an external source registry if stronger grounding is required.
+The lineage check compares unit references to declared candidate sources. Add an optional offline `source_registry` to verify local paths, repository symbols, or saved external receipts if stronger grounding is required. The resolver never fetches URLs during deterministic evaluation.
 
 ### Project profile says an error is acceptable
 
@@ -226,6 +226,14 @@ A golden carries only the authority explicitly granted by the adopting project. 
 ## 11. Maintenance, extension, and compatibility
 
 Keep finding codes stable within a major version. Add fields compatibly and version report or contract shapes when consumers must change. Preserve the four core statuses even when projects use custom labels.
+
+### Typed dimensions and semantic contracts
+
+Golden dimensions may remain dotted strings for backward-compatible exact comparison, or use an object such as `{"path": "decision_ids", "comparator": "set"}`. Supported comparators are `exact`, `set`, `multiset`, `partition`, `mapping`, `coverage`, `graph`, `bounded_numeric`, and `absence`. Malformed or unobservable dimensions return an inconclusive finding rather than a false semantic failure.
+
+An optional `semantic_contract` can define `roles`, path-based `invariants`, `forbidden_collapses`, and a project `claim_ceiling`. It supplies project meaning; the portable evaluator does not invent ontology or authority. Candidate-only detectors are opt-in through `candidate_risk_checks` and remain advisory warnings unless a project profile explicitly tightens them.
+
+An optional `source_registry` maps source IDs to local files/directories, repository symbols, or external URL entries with saved receipts. Local content can be checked for existence and SHA-256. External receipts can be checked for URL identity, digest, and configured freshness without network access.
 
 When adding a schema feature, extend the minimal validator and add positive and negative tests. For full JSON Schema support, replace the bundled minimal checker with a maintained validator library and document the dependency rather than pretending this standard-library subset is complete.
 
