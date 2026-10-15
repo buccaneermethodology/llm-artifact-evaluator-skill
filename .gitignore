@@ -1,0 +1,4 @@
+# Execution-facing artifacts and local candidate/runtime state.
+Dashboard/*
+!Dashboard/.gitkeep
+.kym-tco/*
